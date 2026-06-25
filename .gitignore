@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Project I/O — keep the folders, ignore their contents
+inputs/*
+outputs/*
+!inputs/.gitkeep
+!outputs/.gitkeep
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets (Adobe free-tier engine, optional)
+.env
+pdfservices-api-credentials.json

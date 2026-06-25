@@ -1,0 +1,9 @@
+# Core conversion engine (analyzes PDF layout and rebuilds an editable DOCX).
+# Pulls in PyMuPDF and python-docx as transitive dependencies.
+pdf2docx==0.5.8
+
+# Used directly for pre-flight analysis (digital vs scanned, page/text checks).
+PyMuPDF>=1.23,<2.0
+
+# Used in post-processing to tidy styles/metadata in the produced DOCX.
+python-docx>=1.1.0
