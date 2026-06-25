@@ -17,6 +17,13 @@ outputs/*
 .idea/
 .vscode/
 
-# Secrets (Adobe free-tier engine, optional)
+# Secrets (Adobe free-tier engine, optional) — broad, to catch any naming
 .env
+.env.*
 pdfservices-api-credentials.json
+*credentials*.json
+*pdfservices*.json
+*adobe*.json
+secrets*.json
+*.key
+*.pem
