@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -46,15 +47,42 @@ def _parse_pages(value: str | None) -> tuple[int | None, int | None]:
 
 
 def _collect_inputs(name: str | None) -> list[Path]:
-    """Return the list of PDFs to process."""
+    """Return the list of inputs to process (PDF and HTML)."""
     if name:
         candidate = Path(name)
         if not candidate.is_absolute() and not candidate.exists():
             candidate = INPUT_DIR / name
         if not candidate.exists():
-            raise FileNotFoundError(f"PDF not found: {name}")
+            raise FileNotFoundError(f"Input not found: {name}")
         return [candidate]
-    return sorted(INPUT_DIR.glob("*.pdf"))
+    found = list(INPUT_DIR.glob("*.pdf"))
+    found += INPUT_DIR.glob("*.html")
+    found += INPUT_DIR.glob("*.htm")
+    return sorted(found)
+
+
+def _html_to_clean_pdf(html: Path, work_dir: Path) -> Path:
+    """Make variable fonts static, then render the HTML to a clean PDF (Chrome).
+
+    Returns the produced PDF path. Raises on render failure.
+    """
+    from pdf2docx_converter.html_prep import make_fonts_static
+
+    log = logging.getLogger("convert")
+    html_text = html.read_text(encoding="utf-8")
+    fixed_text, report = make_fonts_static(html_text)
+    log.info("  ↳ fonts: %s", report.summary())
+
+    fixed_html = work_dir / f"{html.stem}.fixed.html"
+    fixed_html.write_text(fixed_text, encoding="utf-8")
+
+    # Import here so the html engine is optional (playwright not always installed).
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
+    from html_to_pdf import render  # type: ignore
+
+    pdf_path = work_dir / f"{html.stem}.pdf"
+    render(fixed_html, pdf_path)
+    return pdf_path
 
 
 def _convert_one(
@@ -65,7 +93,7 @@ def _convert_one(
     postprocess: bool,
     font: str,
 ) -> bool:
-    """Convert a single PDF. Returns True on success, False if skipped/failed."""
+    """Convert a single PDF/HTML input. Returns True on success, else False."""
     log = logging.getLogger("convert")
     out_path = OUTPUT_DIR / f"{pdf.stem}.docx"
 
@@ -73,47 +101,71 @@ def _convert_one(
         log.info("• skip %s (output exists, use --overwrite)", pdf.name)
         return False
 
+    started = time.perf_counter()
+
+    # HTML input: fix variable fonts and render to a clean PDF first, then
+    # convert that. The intermediate PDF lives in a temp dir.
+    tmp_dir: tempfile.TemporaryDirectory | None = None
+    source = pdf
+    if pdf.suffix.lower() in (".html", ".htm"):
+        log.info("• %s — HTML input, rendering to clean PDF…", pdf.name)
+        tmp_dir = tempfile.TemporaryDirectory()
+        try:
+            source = _html_to_clean_pdf(pdf, Path(tmp_dir.name))
+        except Exception as exc:  # noqa: BLE001
+            log.error("✗ %s — HTML→PDF failed: %s", pdf.name, exc)
+            if "playwright" in str(exc).lower() or "executable" in str(exc).lower():
+                log.error("    Hint: pip install -r requirements-html.txt && "
+                          "playwright install chromium")
+            tmp_dir.cleanup()
+            return False
+
     # Pre-flight: make sure this is a digital PDF we can handle.
     try:
-        report = analyze(pdf)
+        report = analyze(source)
     except Exception as exc:
         log.error("✗ %s — could not read PDF: %s", pdf.name, exc)
+        if tmp_dir:
+            tmp_dir.cleanup()
         return False
 
-    # The cloud engine can handle scanned/low-text files (it has its own OCR);
-    # the local engine cannot, so we only gate on these for the local path.
-    if engine == "local":
-        if report.likely_scanned:
-            log.warning(
-                "• skip %s — looks scanned (text on %d/%d pages). OCR is out of scope.",
-                pdf.name, report.pages_with_text, report.page_count,
-            )
-            return False
-        if not report.is_digital:
-            log.warning(
-                "• skip %s — little extractable text (%d chars). Likely not a digital PDF.",
-                pdf.name, report.total_chars,
-            )
-            return False
-
-    started = time.perf_counter()
     try:
-        if engine == "adobe":
-            from pdf2docx_converter.engine_adobe import (
-                AdobeConfigError,
-                AdobeConversionError,
-                convert_file as adobe_convert,
-            )
-            try:
-                adobe_convert(pdf, out_path)
-            except (AdobeConfigError, AdobeConversionError) as exc:
-                log.error("✗ %s — %s", pdf.name, exc)
+        # The cloud engine can handle scanned/low-text files (it has its own OCR);
+        # the local engine cannot, so we only gate on these for the local path.
+        if engine == "local":
+            if report.likely_scanned:
+                log.warning(
+                    "• skip %s — looks scanned (text on %d/%d pages). OCR is out of scope.",
+                    pdf.name, report.pages_with_text, report.page_count,
+                )
                 return False
-        else:
-            convert_file(pdf, out_path, settings)
-    except ConversionError as exc:
-        log.error("✗ %s — %s", pdf.name, exc)
-        return False
+            if not report.is_digital:
+                log.warning(
+                    "• skip %s — little extractable text (%d chars). Likely not a digital PDF.",
+                    pdf.name, report.total_chars,
+                )
+                return False
+
+        try:
+            if engine == "adobe":
+                from pdf2docx_converter.engine_adobe import (
+                    AdobeConfigError,
+                    AdobeConversionError,
+                    convert_file as adobe_convert,
+                )
+                try:
+                    adobe_convert(source, out_path)
+                except (AdobeConfigError, AdobeConversionError) as exc:
+                    log.error("✗ %s — %s", pdf.name, exc)
+                    return False
+            else:
+                convert_file(source, out_path, settings)
+        except ConversionError as exc:
+            log.error("✗ %s — %s", pdf.name, exc)
+            return False
+    finally:
+        if tmp_dir:
+            tmp_dir.cleanup()
 
     # Tidy fonts/whitespace. Never fail the conversion on a post-process error.
     # Font normalization changes glyph metrics, which shifts text in absolutely
@@ -139,9 +191,12 @@ def _convert_one(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Convert digital PDFs to editable DOCX (inputs/ -> outputs/).",
+        description="Convert PDF/HTML to editable DOCX (inputs/ -> outputs/). "
+                    "HTML inputs are rendered to a clean PDF first (variable fonts "
+                    "made static to avoid Type3).",
     )
-    parser.add_argument("file", nargs="?", help="Single PDF (name in inputs/ or a path).")
+    parser.add_argument("file", nargs="?",
+                        help="Single PDF/HTML (name in inputs/ or a path).")
     parser.add_argument("--pages", help="Page range START:END, 0-based, end-exclusive.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing DOCX.")
     parser.add_argument("--workers", type=int, default=0,
