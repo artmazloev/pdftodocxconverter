@@ -1,0 +1,5 @@
+# Optional: render source HTML -> clean PDF with headless Chrome.
+# Use when your PDF is generated from HTML (avoids Type3 fonts / garbled text).
+# After install, download the browser once:  playwright install chromium
+#   python scripts/html_to_pdf.py design.html design.pdf
+playwright>=1.40

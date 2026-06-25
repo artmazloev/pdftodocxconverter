@@ -14,6 +14,11 @@
   выводу `--engine local` (потоковая вёрстка); для `--engine adobe` делается
   только чистка пробелов. Флаги `--no-postprocess`, `--font`,
   `--no-normalize-fonts`; запуск standalone на готовом DOCX.
+- **`scripts/html_to_pdf.py`**: рендер HTML→PDF через headless Chrome
+  (Playwright). Решает корень проблемы Type3-шрифтов для PDF, генерируемых из
+  HTML: Chrome встраивает именованные subset-шрифты, текст остаётся чистым.
+  Рекомендуемый конвейер: HTML → html_to_pdf.py → convert.py --engine adobe.
+- `requirements-html.txt` — опциональная зависимость `playwright`.
 - `requirements-adobe.txt` — опциональная зависимость `pdfservices-sdk`.
 - `docs/ARCHITECTURE.md` — архитектура, сравнение движков, журнал решений.
 - `CHANGELOG.md`.
