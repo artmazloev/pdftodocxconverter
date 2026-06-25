@@ -30,7 +30,11 @@ def _instance_b64(var_path: Path, weight: int) -> str:
     from fontTools.varLib import instancer
 
     font = ttLib.TTFont(var_path)
-    instancer.instantiateVariableFont(font, {"wght": weight}, inplace=True)
+    # updateFontNames=True names the instance properly (e.g. "Manrope ExtraBold")
+    # so PDF→DOCX converters recognise one coherent family per script.
+    instancer.instantiateVariableFont(
+        font, {"wght": weight}, inplace=True, updateFontNames=True
+    )
     buf = io.BytesIO()
     font.save(buf)
     return base64.b64encode(buf.getvalue()).decode()

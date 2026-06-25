@@ -97,7 +97,12 @@ def _instance_b64(font_bytes: bytes, weight: int) -> str | None:
         if "wght" in axes:
             lo, hi = axes["wght"]
             w = max(lo, min(hi, weight))
-        instancer.instantiateVariableFont(font, {"wght": w}, inplace=True)
+        # updateFontNames=True renames the instance properly (e.g. "Manrope
+        # ExtraBold"), so converters like Adobe recognise a single coherent
+        # family instead of substituting different fonts per script.
+        instancer.instantiateVariableFont(
+            font, {"wght": w}, inplace=True, updateFontNames=True
+        )
         buf = io.BytesIO()
         font.save(buf)
         return base64.b64encode(buf.getvalue()).decode()
