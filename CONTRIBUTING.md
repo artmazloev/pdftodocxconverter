@@ -17,13 +17,18 @@ pip install -r requirements.txt
 ## Структура проекта
 
 ```
-convert.py                  # точка входа: inputs/ → outputs/
+convert.py                  # точка входа: inputs/ → outputs/, выбор движка
 pdf2docx_converter/
   ├── analyzer.py           # детект цифровой PDF / скан
-  ├── engine_local.py       # обёртка над pdf2docx (основной движок)
+  ├── engine_local.py       # офлайн-движок (pdf2docx), по умолчанию
+  ├── engine_adobe.py       # облачный движок (Adobe PDF Services)
   └── config.py             # настройки точности/качества
+scripts/smoke_test.py       # e2e-проверка (CI)
+docs/ARCHITECTURE.md        # архитектура и решения
 .github/                    # шаблоны issues/PR, CI
 ```
+
+Подробнее об архитектуре и движках — в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Рабочий процесс (Git Flow)
 
@@ -42,18 +47,22 @@ pdf2docx_converter/
 - **Фаза 1 — MVP** ✅ Базовый конвертер `inputs/ → outputs/`.
 - **Фаза 2 — Надёжность** Обработка ошибок, edge-cases, логирование.
 - **Фаза 3 — Качество** Тюнинг точности, тестовый корпус PDF, пост-обработка.
-- **Фаза 4 — Опционально** Adobe free-tier движок, OCR для сканов.
+- **Фаза 4 — Движки** ✅ Adobe free-tier движок (`--engine adobe`); ⏳ OCR для сканов.
+
+Актуальный статус — в [Roadmap #11](https://github.com/artmazloev/pdftodocxconverter/issues/11).
 
 ## Тестирование изменений
 
-Перед PR прогони реальные PDF:
+Перед PR прогони smoke-тест и реальные PDF:
 
 ```bash
-python convert.py -v          # подробный лог
+python scripts/smoke_test.py  # быстрый e2e (как в CI)
+python convert.py -v          # на реальных файлах, подробный лог
 ```
 
 Проверь, что DOCX открывается в Word/Pages и **редактируется** (текст не превратился
-в картинку, таблицы остались таблицами).
+в картинку, таблицы остались таблицами). Если трогал Adobe-движок — прогони с
+`--engine adobe` на тестовых ключах.
 
 ## Стиль кода
 
