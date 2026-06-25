@@ -57,7 +57,9 @@ def _collect_inputs(name: str | None) -> list[Path]:
     return sorted(INPUT_DIR.glob("*.pdf"))
 
 
-def _convert_one(pdf: Path, settings: ConvertSettings, overwrite: bool) -> bool:
+def _convert_one(
+    pdf: Path, settings: ConvertSettings, overwrite: bool, engine: str
+) -> bool:
     """Convert a single PDF. Returns True on success, False if skipped/failed."""
     log = logging.getLogger("convert")
     out_path = OUTPUT_DIR / f"{pdf.stem}.docx"
@@ -73,22 +75,37 @@ def _convert_one(pdf: Path, settings: ConvertSettings, overwrite: bool) -> bool:
         log.error("✗ %s — could not read PDF: %s", pdf.name, exc)
         return False
 
-    if report.likely_scanned:
-        log.warning(
-            "• skip %s — looks scanned (text on %d/%d pages). OCR is out of scope.",
-            pdf.name, report.pages_with_text, report.page_count,
-        )
-        return False
-    if not report.is_digital:
-        log.warning(
-            "• skip %s — little extractable text (%d chars). Likely not a digital PDF.",
-            pdf.name, report.total_chars,
-        )
-        return False
+    # The cloud engine can handle scanned/low-text files (it has its own OCR);
+    # the local engine cannot, so we only gate on these for the local path.
+    if engine == "local":
+        if report.likely_scanned:
+            log.warning(
+                "• skip %s — looks scanned (text on %d/%d pages). OCR is out of scope.",
+                pdf.name, report.pages_with_text, report.page_count,
+            )
+            return False
+        if not report.is_digital:
+            log.warning(
+                "• skip %s — little extractable text (%d chars). Likely not a digital PDF.",
+                pdf.name, report.total_chars,
+            )
+            return False
 
     started = time.perf_counter()
     try:
-        convert_file(pdf, out_path, settings)
+        if engine == "adobe":
+            from pdf2docx_converter.engine_adobe import (
+                AdobeConfigError,
+                AdobeConversionError,
+                convert_file as adobe_convert,
+            )
+            try:
+                adobe_convert(pdf, out_path)
+            except (AdobeConfigError, AdobeConversionError) as exc:
+                log.error("✗ %s — %s", pdf.name, exc)
+                return False
+        else:
+            convert_file(pdf, out_path, settings)
     except ConversionError as exc:
         log.error("✗ %s — %s", pdf.name, exc)
         return False
@@ -108,6 +125,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing DOCX.")
     parser.add_argument("--workers", type=int, default=0,
                         help="CPU workers (0 = single process, best for debugging).")
+    parser.add_argument(
+        "--engine", choices=["local", "adobe"], default="local",
+        help="Conversion engine: 'local' (offline, pdf2docx) or 'adobe' "
+             "(cloud, higher fidelity — UPLOADS the file to Adobe).",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging.")
     args = parser.parse_args(argv)
 
@@ -134,8 +156,12 @@ def main(argv: list[str] | None = None) -> int:
 
     settings = ConvertSettings(start=start, end=end, cpu_count=args.workers)
 
+    if args.engine == "adobe":
+        log.warning("Engine: ADOBE — files will be uploaded to Adobe's cloud.")
     log.info("Found %d PDF(s) to process.", len(pdfs))
-    succeeded = sum(_convert_one(pdf, settings, args.overwrite) for pdf in pdfs)
+    succeeded = sum(
+        _convert_one(pdf, settings, args.overwrite, args.engine) for pdf in pdfs
+    )
     log.info("Done: %d/%d converted.", succeeded, len(pdfs))
 
     # Non-zero exit if nothing succeeded while there was work to do.

@@ -1,0 +1,4 @@
+# Optional cloud engine — Adobe PDF Services (Export PDF: PDF -> DOCX).
+# Install only if you use `--engine adobe`:  pip install -r requirements-adobe.txt
+# NOTE: this engine uploads your PDF to Adobe's cloud.
+pdfservices-sdk==4.2.0
