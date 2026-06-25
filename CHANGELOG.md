@@ -8,6 +8,11 @@
 ### Added
 - Облачный движок **Adobe PDF Services** (`--engine adobe`) для дизайнерских PDF,
   с которыми не справляется локальный движок.
+- **Постобработка `postprocess.py`**: нормализация шрифтов (сведение «угаданных»
+  Type3-шрифтов к одному, по умолчанию Arial), чистка множественных пробелов,
+  склейка соседних одинаковых runs. Включена по умолчанию (`--no-postprocess`,
+  `--font`); запускается и standalone на готовом DOCX (`python -m
+  pdf2docx_converter.postprocess file.docx`).
 - `requirements-adobe.txt` — опциональная зависимость `pdfservices-sdk`.
 - `docs/ARCHITECTURE.md` — архитектура, сравнение движков, журнал решений.
 - `CHANGELOG.md`.

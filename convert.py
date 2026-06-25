@@ -58,7 +58,12 @@ def _collect_inputs(name: str | None) -> list[Path]:
 
 
 def _convert_one(
-    pdf: Path, settings: ConvertSettings, overwrite: bool, engine: str
+    pdf: Path,
+    settings: ConvertSettings,
+    overwrite: bool,
+    engine: str,
+    postprocess: bool,
+    font: str,
 ) -> bool:
     """Convert a single PDF. Returns True on success, False if skipped/failed."""
     log = logging.getLogger("convert")
@@ -110,6 +115,15 @@ def _convert_one(
         log.error("✗ %s — %s", pdf.name, exc)
         return False
 
+    # Tidy fonts/whitespace. Never fail the conversion on a post-process error.
+    if postprocess:
+        try:
+            from pdf2docx_converter.postprocess import normalize_docx
+            stats = normalize_docx(out_path, target_font=font)
+            log.info("  ↳ post-process: %s", stats.summary())
+        except Exception as exc:  # noqa: BLE001 — best-effort cleanup
+            log.warning("  ↳ post-process skipped for %s: %s", out_path.name, exc)
+
     elapsed = time.perf_counter() - started
     log.info("✓ %s -> outputs/%s  (%d pages, %.1fs)",
              pdf.name, out_path.name, report.page_count, elapsed)
@@ -129,6 +143,15 @@ def main(argv: list[str] | None = None) -> int:
         "--engine", choices=["local", "adobe"], default="local",
         help="Conversion engine: 'local' (offline, pdf2docx) or 'adobe' "
              "(cloud, higher fidelity — UPLOADS the file to Adobe).",
+    )
+    parser.add_argument(
+        "--font", default="Arial",
+        help="Target font for post-processing (unifies guessed/junk fonts). "
+             "Default: Arial.",
+    )
+    parser.add_argument(
+        "--no-postprocess", action="store_true",
+        help="Skip font/whitespace cleanup of the produced DOCX.",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging.")
     args = parser.parse_args(argv)
@@ -160,7 +183,11 @@ def main(argv: list[str] | None = None) -> int:
         log.warning("Engine: ADOBE — files will be uploaded to Adobe's cloud.")
     log.info("Found %d PDF(s) to process.", len(pdfs))
     succeeded = sum(
-        _convert_one(pdf, settings, args.overwrite, args.engine) for pdf in pdfs
+        _convert_one(
+            pdf, settings, args.overwrite, args.engine,
+            not args.no_postprocess, args.font,
+        )
+        for pdf in pdfs
     )
     log.info("Done: %d/%d converted.", succeeded, len(pdfs))
 
