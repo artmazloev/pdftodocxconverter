@@ -195,12 +195,27 @@ def _inject_bundled(html: str, weights: list[int], report: PrepReport) -> str:
     return style + html
 
 
-def make_fonts_static(html: str, weights: list[int] | None = None) -> tuple[str, PrepReport]:
+# Override that disables stroke/halo on SVG text. Stroked (outlined) text is
+# printed by Chrome as Type3, which converters split into per-glyph spaces
+# ("Г р у з и ю"). Removing the stroke makes those labels normal Type0 text.
+_NOSTROKE_STYLE = (
+    "<style data-flatten-stroke>svg text{stroke:none!important;"
+    "paint-order:normal!important}</style>"
+)
+
+
+def make_fonts_static(
+    html: str,
+    weights: list[int] | None = None,
+    flatten_text_stroke: bool = False,
+) -> tuple[str, PrepReport]:
     """Make fonts self-contained for deterministic rendering.
 
     - embedded variable `@font-face` → static instances (fixes Type3);
     - referenced-but-not-embedded bundled fonts (e.g. Manrope from Google Fonts)
       → injected as local static `@font-face`, with the Google Fonts links removed.
+    - `flatten_text_stroke`: drop stroke/halo from SVG text so outlined labels
+      (e.g. on a map) don't become Type3 and get split into per-glyph spaces.
 
     Returns (new_html, report).
     """
@@ -248,5 +263,12 @@ def make_fonts_static(html: str, weights: list[int] | None = None) -> tuple[str,
     if report.injected_families:
         new_html, n = _GOOGLE_LINK_RE.subn("", new_html)
         report.google_links_removed = n
+
+    if flatten_text_stroke:
+        if re.search(r"</head>", new_html, re.IGNORECASE):
+            new_html = re.sub(r"</head>", _NOSTROKE_STYLE + "</head>", new_html,
+                              count=1, flags=re.IGNORECASE)
+        else:
+            new_html = _NOSTROKE_STYLE + new_html
 
     return new_html, report

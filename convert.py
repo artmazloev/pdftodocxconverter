@@ -61,7 +61,7 @@ def _collect_inputs(name: str | None) -> list[Path]:
     return sorted(found)
 
 
-def _html_to_clean_pdf(html: Path, work_dir: Path) -> Path:
+def _html_to_clean_pdf(html: Path, work_dir: Path, flatten_text_stroke: bool) -> Path:
     """Make variable fonts static, then render the HTML to a clean PDF (Chrome).
 
     Returns the produced PDF path. Raises on render failure.
@@ -70,7 +70,9 @@ def _html_to_clean_pdf(html: Path, work_dir: Path) -> Path:
 
     log = logging.getLogger("convert")
     html_text = html.read_text(encoding="utf-8")
-    fixed_text, report = make_fonts_static(html_text)
+    fixed_text, report = make_fonts_static(
+        html_text, flatten_text_stroke=flatten_text_stroke
+    )
     log.info("  ↳ fonts: %s", report.summary())
 
     fixed_html = work_dir / f"{html.stem}.fixed.html"
@@ -92,6 +94,7 @@ def _convert_one(
     engine: str,
     postprocess: bool,
     font: str,
+    flatten_text_stroke: bool,
 ) -> bool:
     """Convert a single PDF/HTML input. Returns True on success, else False."""
     log = logging.getLogger("convert")
@@ -111,7 +114,9 @@ def _convert_one(
         log.info("• %s — HTML input, rendering to clean PDF…", pdf.name)
         tmp_dir = tempfile.TemporaryDirectory()
         try:
-            source = _html_to_clean_pdf(pdf, Path(tmp_dir.name))
+            source = _html_to_clean_pdf(
+                pdf, Path(tmp_dir.name), flatten_text_stroke
+            )
         except Exception as exc:  # noqa: BLE001
             log.error("✗ %s — HTML→PDF failed: %s", pdf.name, exc)
             if "playwright" in str(exc).lower() or "executable" in str(exc).lower():
@@ -215,6 +220,12 @@ def main(argv: list[str] | None = None) -> int:
         "--no-postprocess", action="store_true",
         help="Skip font/whitespace cleanup of the produced DOCX.",
     )
+    parser.add_argument(
+        "--clean-svg-text", action="store_true",
+        help="HTML input: drop stroke/halo from SVG text so outlined labels "
+             "(e.g. on maps) don't become Type3 and split into per-glyph spaces. "
+             "Removes the white outline behind such labels.",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging.")
     args = parser.parse_args(argv)
 
@@ -247,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     succeeded = sum(
         _convert_one(
             pdf, settings, args.overwrite, args.engine,
-            not args.no_postprocess, args.font,
+            not args.no_postprocess, args.font, args.clean_svg_text,
         )
         for pdf in pdfs
     )
