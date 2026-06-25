@@ -3,3 +3,5 @@
 # After install, download the browser once:  playwright install chromium
 #   python scripts/html_to_pdf.py design.html design.pdf
 playwright>=1.40
+# Instancing variable fonts into static @font-face (scripts/make_static_fontface.py)
+fonttools>=4.0
