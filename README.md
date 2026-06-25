@@ -1,6 +1,6 @@
 # pdftodocxconverter
 
-Локальный конвертер **PDF → DOCX** для запуска на Mac из IDE (Cursor).
+Локальный конвертер **PDF/HTML → DOCX** для запуска на Mac из IDE (Cursor).
 Цель — отдать **редактируемый** Word-документ (настоящие абзацы, таблицы, стили —
 не «текст-картинка»), максимально сохранив исходный вид.
 
@@ -10,10 +10,14 @@
 - **`adobe`** — облачный (Adobe PDF Services), выше точность на сложной вёрстке.
   Загружает файл в облако Adobe.
 
+Принимает на вход **PDF** и **HTML**. Для HTML-исходников см. полный рецепт
+**HTML → DOCX через Adobe**: [docs/HTML_TO_DOCX.md](docs/HTML_TO_DOCX.md).
+
 ## Как это работает
 
 ```
-PDF → анализ (цифровой / скан) → движок (local | adobe) → DOCX
+PDF  → анализ (цифровой / скан) ─┐
+HTML → фикс шрифтов → Chrome PDF ─┴→ движок (local | adobe) → постобработка → DOCX
 ```
 
 - **Локальный движок** — [`pdf2docx`](https://github.com/dothinking/pdf2docx)
@@ -226,7 +230,8 @@ pdftodocxconverter/
 ├── scripts/
 │   └── smoke_test.py           # e2e-проверка (используется в CI)
 ├── docs/
-│   └── ARCHITECTURE.md         # архитектура, движки, решения
+│   ├── ARCHITECTURE.md         # архитектура, движки, решения
+│   └── HTML_TO_DOCX.md         # полный путь HTML → DOCX через Adobe
 ├── CONTRIBUTING.md             # процесс разработки
 ├── CHANGELOG.md                # история изменений
 └── .github/                    # шаблоны issues/PR, CI
