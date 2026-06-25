@@ -116,11 +116,18 @@ def _convert_one(
         return False
 
     # Tidy fonts/whitespace. Never fail the conversion on a post-process error.
+    # Font normalization changes glyph metrics, which shifts text in absolutely
+    # positioned frames — so it is only safe on flow-based output (local engine).
+    # Adobe's layout-faithful output keeps its fonts; we only tidy whitespace.
     if postprocess:
+        normalize_fonts = engine != "adobe"
         try:
             from pdf2docx_converter.postprocess import normalize_docx
-            stats = normalize_docx(out_path, target_font=font)
-            log.info("  ↳ post-process: %s", stats.summary())
+            stats = normalize_docx(
+                out_path, target_font=font, normalize_fonts=normalize_fonts
+            )
+            note = "" if normalize_fonts else " (whitespace only, fonts preserved)"
+            log.info("  ↳ post-process%s: %s", note, stats.summary())
         except Exception as exc:  # noqa: BLE001 — best-effort cleanup
             log.warning("  ↳ post-process skipped for %s: %s", out_path.name, exc)
 

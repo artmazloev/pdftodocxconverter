@@ -153,16 +153,25 @@ def normalize_docx(
     docx_path: str | Path,
     target_font: str = "Arial",
     keep_fonts: set[str] | None = None,
+    normalize_fonts: bool = True,
     collapse_spaces: bool = True,
     merge_runs: bool = True,
 ) -> CleanupStats:
-    """Rewrite a DOCX in place: unify text fonts and tidy whitespace.
+    """Clean up a DOCX in place. Returns stats describing what changed.
 
-    Returns stats describing what changed.
+    ⚠️  Font normalization changes glyph metrics. In layout-faithful output
+    (e.g. Adobe's, which positions text in absolute frames) this can make
+    blocks overflow / shift. Use `normalize_fonts=False` to only tidy
+    whitespace and preserve such layouts. For flow-based output (the local
+    engine) font normalization is safe and helpful.
     """
     docx_path = Path(docx_path)
     keep = SYMBOL_FONTS | {target_font} | (keep_fonts or set())
     stats = CleanupStats()
+
+    # Font normalization implies run-merging; without it, leave runs/structure
+    # untouched so positioned layouts don't move.
+    do_merge = merge_runs and normalize_fonts
 
     tmp_path = docx_path.with_suffix(docx_path.suffix + ".tmp")
     with zipfile.ZipFile(docx_path) as zin:
@@ -173,10 +182,11 @@ def normalize_docx(
                 data = zin.read(item.filename)
                 if item.filename in targets:
                     root = etree.fromstring(data)
-                    _normalize_rfonts(root, target_font, keep, stats)
+                    if normalize_fonts:
+                        _normalize_rfonts(root, target_font, keep, stats)
                     if collapse_spaces:
                         _collapse_spaces(root, stats)
-                    if merge_runs:
+                    if do_merge:
                         _merge_adjacent_runs(root, stats)
                     data = etree.tostring(
                         root, xml_declaration=True, encoding="UTF-8", standalone=True
@@ -199,6 +209,9 @@ def _main(argv: list[str] | None = None) -> int:
                         help="Target font for all normal text (default: Arial).")
     parser.add_argument("--keep", nargs="*", default=[],
                         help="Extra font names to preserve.")
+    parser.add_argument("--no-normalize-fonts", action="store_true",
+                        help="Do not touch fonts (safe for layout-faithful DOCX; "
+                             "only tidies whitespace).")
     parser.add_argument("--no-collapse-spaces", action="store_true",
                         help="Do not collapse double spaces.")
     parser.add_argument("--no-merge-runs", action="store_true",
@@ -210,6 +223,7 @@ def _main(argv: list[str] | None = None) -> int:
         args.docx,
         target_font=args.font,
         keep_fonts=set(args.keep),
+        normalize_fonts=not args.no_normalize_fonts,
         collapse_spaces=not args.no_collapse_spaces,
         merge_runs=not args.no_merge_runs,
     )
