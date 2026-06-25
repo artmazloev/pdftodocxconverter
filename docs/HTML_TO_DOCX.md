@@ -39,14 +39,22 @@ PDF_SERVICES_CLIENT_SECRET=твой_client_secret
 python convert.py --engine adobe              # все html/pdf из inputs/
 # или один файл:
 python convert.py CANDIDATE_v8.html --engine adobe
+# если на карте/в SVG подписи бьются пробелами («Г р у з и ю»):
+python convert.py CANDIDATE_v8.html --engine adobe --clean-svg-text
 ```
 
 Готовый DOCX появится в `outputs/`. Скрипт сам:
-1. заменит вариативные `@font-face` на статические инстансы (фикс Type3);
-2. отрендерит чистый PDF через headless Chrome;
-3. прогонит его через Adobe;
-4. сделает безопасную постобработку (для Adobe — только чистка пробелов, шрифты и
+1. чинит шрифты: вариативные `@font-face` → статические инстансы (фикс Type3); а
+   если шрифт (Manrope) только ссылается, но не встроен — **подставляет локальный
+   Manrope** из `assets/` и убирает Google-Fonts ссылки (рендер офлайн);
+2. (опц. `--clean-svg-text`) снимает обводку с SVG-текста, чтобы подписи карт не
+   становились Type3;
+3. отрендерит чистый PDF через headless Chrome;
+4. прогонит его через Adobe;
+5. сделает безопасную постобработку (для Adobe — только чистка пробелов, шрифты и
    макет не трогаются).
+
+Подробнее про шрифты и причины искажений — [FONTS.md](FONTS.md).
 
 ## Что ожидать
 

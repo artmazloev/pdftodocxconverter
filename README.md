@@ -121,7 +121,13 @@ playwright install chromium            # скачать браузер (один
 python convert.py --engine adobe
 # или один файл:
 python convert.py design.html --engine adobe
+# если на карте/в SVG подписи бьются пробелами («Г р у з и ю») — убрать обводку:
+python convert.py design.html --engine adobe --clean-svg-text
 ```
+
+**`--clean-svg-text`** убирает обводку/ореол у SVG-текста. Обведённый текст Chrome
+печатает как Type3, и конвертеры дробят его на буквы пробелами. Флаг лечит это
+(цена — пропадает белый ореол под подписями). Включай для документов с картами.
 
 **Шрифт не встроен в HTML?** Если документ ссылается на **Manrope**, но грузит
 его с Google Fonts (по `<link>`) или ждёт установленным в системе — конвертер сам
@@ -222,23 +228,28 @@ python -m pdf2docx_converter.postprocess file.docx --font "Arial"
 
 ```
 pdftodocxconverter/
-├── convert.py                  # точка входа: inputs/ → outputs/
-├── requirements.txt            # зависимости локального движка
-├── requirements-adobe.txt      # доп. зависимость для --engine adobe
-├── inputs/                     # сюда кладёшь PDF (содержимое в git не попадает)
+├── convert.py                  # точка входа: inputs/ → outputs/ (PDF и HTML)
+├── requirements.txt            # ядро (pdf2docx, PyMuPDF, python-docx)
+├── requirements-adobe.txt      # для --engine adobe (pdfservices-sdk)
+├── requirements-html.txt       # для HTML-входа (playwright + fonttools)
+├── inputs/                     # сюда кладёшь PDF/HTML (в git не попадает)
 ├── outputs/                    # сюда падают DOCX
 ├── pdf2docx_converter/
 │   ├── analyzer.py             # проверка: цифровой PDF или скан
 │   ├── engine_local.py         # офлайн-движок (pdf2docx)
 │   ├── engine_adobe.py         # облачный движок (Adobe PDF Services)
+│   ├── html_prep.py            # фикс шрифтов в HTML (variable→static, инжект Manrope)
 │   ├── postprocess.py          # нормализация шрифтов и пробелов в DOCX
-│   ├── html_prep.py            # variable→static шрифты в HTML
-│   └── config.py               # настройки качества/точности
+│   ├── config.py               # настройки качества/точности
+│   └── assets/                 # встроенный Manrope (OFL) для инжекта
 ├── scripts/
-│   └── smoke_test.py           # e2e-проверка (используется в CI)
+│   ├── smoke_test.py           # e2e-проверка (используется в CI)
+│   ├── html_to_pdf.py          # HTML → PDF через headless Chrome
+│   └── make_static_fontface.py # variable-шрифт → статический @font-face (CSS)
 ├── docs/
 │   ├── ARCHITECTURE.md         # архитектура, движки, решения
-│   └── HTML_TO_DOCX.md         # полный путь HTML → DOCX через Adobe
+│   ├── HTML_TO_DOCX.md         # полный путь HTML → DOCX через Adobe
+│   └── FONTS.md                # шрифты: причины искажений и фиксы
 ├── CONTRIBUTING.md             # процесс разработки
 ├── CHANGELOG.md                # история изменений
 └── .github/                    # шаблоны issues/PR, CI
@@ -263,3 +274,4 @@ pdftodocxconverter/
 
 Полный план — [Roadmap #11](https://github.com/artmazloev/pdftodocxconverter/issues/11).
 История изменений — [CHANGELOG.md](CHANGELOG.md). Архитектура — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Шрифты (причины искажений и фиксы) — [docs/FONTS.md](docs/FONTS.md).

@@ -17,18 +17,24 @@ pip install -r requirements.txt
 ## Структура проекта
 
 ```
-convert.py                  # точка входа: inputs/ → outputs/, выбор движка
+convert.py                  # точка входа: inputs/ → outputs/ (PDF/HTML), выбор движка
 pdf2docx_converter/
   ├── analyzer.py           # детект цифровой PDF / скан
   ├── engine_local.py       # офлайн-движок (pdf2docx), по умолчанию
   ├── engine_adobe.py       # облачный движок (Adobe PDF Services)
-  └── config.py             # настройки точности/качества
-scripts/smoke_test.py       # e2e-проверка (CI)
-docs/ARCHITECTURE.md        # архитектура и решения
+  ├── html_prep.py          # фикс шрифтов в HTML (variable→static, инжект Manrope)
+  ├── postprocess.py        # нормализация шрифтов/пробелов в DOCX
+  ├── config.py             # настройки точности/качества
+  └── assets/               # встроенный Manrope (OFL)
+scripts/
+  ├── smoke_test.py         # e2e-проверка (CI)
+  ├── html_to_pdf.py        # HTML → PDF (headless Chrome)
+  └── make_static_fontface.py
+docs/                       # ARCHITECTURE, HTML_TO_DOCX, FONTS
 .github/                    # шаблоны issues/PR, CI
 ```
 
-Подробнее об архитектуре и движках — в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Подробнее: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/FONTS.md](docs/FONTS.md).
 
 ## Рабочий процесс (Git Flow)
 
