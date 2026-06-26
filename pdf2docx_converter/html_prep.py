@@ -53,8 +53,9 @@ _GOOGLE_LINK_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Fallback weights if none can be detected in the document.
-_DEFAULT_WEIGHTS = [400, 700]
+# Always instance these (CSS default 400/normal, 500/medium, 700/bold) so normal
+# text never falls back to a heavier available weight ("everything looks bold").
+_BASELINE_WEIGHTS = {400, 500, 700}
 
 
 @dataclass
@@ -86,17 +87,22 @@ class PrepReport:
 
 
 def _used_weights(html: str) -> list[int]:
-    """Collect font-weights actually used in the document."""
-    found: set[int] = set()
+    """Collect font-weights used in the document, plus the implicit baseline.
+
+    Text without an explicit `font-weight` defaults to 400 (normal); 700 is the
+    default "bold". These rarely appear as explicit declarations, but if we don't
+    instance a 400 face the browser falls back to the nearest available weight —
+    e.g. with only [600,700,800] all normal text renders as 600 (everything looks
+    bold). So we always include the baseline weights.
+    """
+    found: set[int] = set(_BASELINE_WEIGHTS)
     for raw in _WEIGHT_USE_RE.findall(html):
         token = raw.lower()
         if token.isdigit():
             found.add(int(token))
         elif token in _KEYWORD_WEIGHTS:
             found.add(_KEYWORD_WEIGHTS[token])
-    # Drop weights that only appear inside @font-face range declarations is not
-    # needed — instancing a couple of extra weights is harmless.
-    return sorted(found) or list(_DEFAULT_WEIGHTS)
+    return sorted(found)
 
 
 def _is_variable(font_bytes: bytes) -> bool:
