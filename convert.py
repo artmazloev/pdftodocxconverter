@@ -32,6 +32,11 @@ def _setup_logging(verbose: bool) -> None:
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)-7s %(message)s",
     )
+    # Third-party libraries log a lot at INFO (fontTools prints ~10 lines per font
+    # weight while instancing). Keep our output readable; show theirs only in -v.
+    noisy_level = logging.DEBUG if verbose else logging.WARNING
+    for name in ("fontTools", "fontTools.varLib.instancer", "fontTools.subset"):
+        logging.getLogger(name).setLevel(noisy_level)
 
 
 def _parse_pages(value: str | None) -> tuple[int | None, int | None]:
