@@ -122,4 +122,5 @@ docs/                            # ARCHITECTURE, HTML_TO_DOCX, FONTS
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура, движки, решения
 - [docs/HTML_TO_DOCX.md](docs/HTML_TO_DOCX.md) — полный путь HTML → DOCX через Adobe
 - [docs/FONTS.md](docs/FONTS.md) — шрифты: причины искажений и фиксы
+- [docs/ROADMAP.md](docs/ROADMAP.md) — план развития (PPTX, десктоп-приложение)
 - [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md)
