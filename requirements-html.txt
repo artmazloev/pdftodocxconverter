@@ -5,3 +5,5 @@
 playwright>=1.40
 # Instancing variable fonts into static @font-face (scripts/make_static_fontface.py)
 fonttools>=4.0
+# Lets fontTools read/write WOFF2 fonts embedded in HTML (WOFF2 uses Brotli).
+brotli>=1.1.0

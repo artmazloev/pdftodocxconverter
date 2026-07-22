@@ -133,6 +133,9 @@ def _instance_b64(font_bytes: bytes, weight: int) -> str | None:
         instancer.instantiateVariableFont(
             font, {"wght": w}, inplace=True, updateFontNames=True
         )
+        # Emit plain TTF (sfnt), matching format('truetype') in the @font-face —
+        # even if the source was WOFF/WOFF2 (flavor would otherwise be kept).
+        font.flavor = None
         buf = io.BytesIO()
         font.save(buf)
         return base64.b64encode(buf.getvalue()).decode()
